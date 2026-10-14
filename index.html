@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport"
-content="width=device-width, initial-scale=1.0,
-maximum-scale=1.0,user-scalable=no">
+content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <title>Empire of Crime</title>
 
@@ -52,6 +51,12 @@ body {
   color: #d5d9df;
 }
 
+#status {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #aeb8c5;
+}
+
 #controls {
   position: absolute;
   bottom: 25px;
@@ -65,10 +70,11 @@ body {
 button {
   border: 1px solid #697383;
   border-radius: 12px;
-  background: #202833eF;
+  background: #202833ef;
   color: white;
   font-size: 23px;
   touch-action: none;
+  cursor: pointer;
 }
 
 button:active {
@@ -108,19 +114,53 @@ button:active {
 
 #message {
   position: absolute;
-  left: 15%;
-  right: 15%;
-  top: 43%;
+  left: 8%;
+  right: 8%;
+  top: 35%;
   padding: 20px;
   text-align: center;
   border-radius: 15px;
   background: #080b10f2;
   border: 1px solid #f5a623;
   display: none;
+  z-index: 10;
 }
 
 #message h2 {
   color: #f5a623;
+}
+
+#message p {
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+#continue {
+  padding: 12px 22px;
+  font-size: 14px;
+  background: #f5a623;
+  color: #111;
+  font-weight: bold;
+}
+
+@media (max-width: 400px) {
+  #controls {
+    left: 12px;
+    bottom: 18px;
+    grid-template-columns: 48px 48px 48px;
+    grid-template-rows: 48px 48px;
+  }
+
+  #action {
+    right: 12px;
+    bottom: 35px;
+    width: 78px;
+    height: 58px;
+  }
+
+  #hud h2 {
+    font-size: 17px;
+  }
 }
 </style>
 </head>
@@ -160,20 +200,22 @@ const message = document.getElementById("message");
 const messageTitle = document.getElementById("messageTitle");
 const messageText = document.getElementById("messageText");
 
-let W, H;
-let worldW = 1800;
-let worldH = 1800;
+let W;
+let H;
+
+const worldW = 1800;
+const worldH = 1800;
 
 const player = {
-  x: 180,
-  y: 180,
+  x: 280,
+  y: 280,
   size: 22,
   speed: 3
 };
 
 const police = {
-  x: 850,
-  y: 850,
+  x: 750,
+  y: 750,
   size: 25,
   active: false
 };
@@ -186,21 +228,17 @@ let gameOver = false;
 const keys = {};
 const buildings = [];
 
+// Set up the game screen.
 function resize() {
-  W = canvas.width = window.innerWidth *
-      Math.min(window.devicePixelRatio || 1, 2);
-  H = canvas.height = window.innerHeight *
-      Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
 
   canvas.style.width = window.innerWidth + "px";
   canvas.style.height = window.innerHeight + "px";
 
-  ctx.setTransform(
-    Math.min(window.devicePixelRatio || 1, 2),
-    0, 0,
-    Math.min(window.devicePixelRatio || 1, 2),
-    0, 0
-  );
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   W = window.innerWidth;
   H = window.innerHeight;
@@ -209,7 +247,7 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-// Generate city blocks.
+// Generate the city buildings.
 for (let x = 80; x < worldW; x += 240) {
   for (let y = 80; y < worldH; y += 240) {
     buildings.push({
@@ -222,6 +260,23 @@ for (let x = 80; x < worldW; x += 240) {
   }
 }
 
+// Keep building window colours stable.
+const windows = buildings.map(b => {
+  const result = [];
+
+  for (let wx = b.x + 14; wx < b.x + b.w - 10; wx += 27) {
+    for (let wy = b.y + 15; wy < b.y + b.h - 10; wy += 28) {
+      result.push({
+        x: wx,
+        y: wy,
+        color: Math.random() > 0.5 ? "#e7b85c" : "#43515f"
+      });
+    }
+  }
+
+  return result;
+});
+
 const goal = {
   x: 1100,
   y: 300,
@@ -232,11 +287,14 @@ function setKey(key, value) {
   keys[key] = value;
 }
 
+// Keyboard controls.
 document.addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
 
-  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "]
-      .includes(k)) {
+  if (
+    ["arrowup", "arrowdown", "arrowleft", "arrowright", " "]
+      .includes(k)
+  ) {
     e.preventDefault();
   }
 
@@ -247,6 +305,7 @@ document.addEventListener("keyup", e => {
   setKey(e.key.toLowerCase(), false);
 });
 
+// Touch controls for mobile phones.
 function bindButton(id, key) {
   const button = document.getElementById(id);
 
@@ -263,6 +322,7 @@ function bindButton(id, key) {
 
   button.addEventListener("pointerup", release);
   button.addEventListener("pointercancel", release);
+
   button.addEventListener("lostpointercapture", () => {
     setKey(key, false);
   });
@@ -273,6 +333,7 @@ bindButton("down", "arrowdown");
 bindButton("left", "arrowleft");
 bindButton("right", "arrowright");
 
+// Check whether the player is touching a building.
 function collides(x, y, size) {
   return buildings.some(b =>
     x + size / 2 > b.x &&
@@ -282,6 +343,7 @@ function collides(x, y, size) {
   );
 }
 
+// Move the player without allowing movement through buildings.
 function movePlayer(dx, dy) {
   const nx = Math.max(
     player.size,
@@ -302,11 +364,11 @@ function movePlayer(dx, dy) {
   }
 }
 
+// Draw the roads.
 function drawRoads() {
   ctx.fillStyle = "#20262c";
   ctx.fillRect(0, 0, worldW, worldH);
 
-  // Road grid.
   for (let x = 0; x < worldW; x += 240) {
     ctx.fillStyle = "#383e43";
     ctx.fillRect(x, 0, 65, worldH);
@@ -334,8 +396,9 @@ function drawRoads() {
   }
 }
 
+// Draw buildings and their windows.
 function drawBuildings() {
-  buildings.forEach(b => {
+  buildings.forEach((b, i) => {
     ctx.fillStyle = "#00000055";
     ctx.fillRect(b.x + 7, b.y + 7, b.w, b.h);
 
@@ -346,33 +409,39 @@ function drawBuildings() {
     ctx.lineWidth = 2;
     ctx.strokeRect(b.x, b.y, b.w, b.h);
 
-    // Lit windows.
-    for (let wx = b.x + 14; wx < b.x + b.w - 10; wx += 27) {
-      for (let wy = b.y + 15; wy < b.y + b.h - 10; wy += 28) {
-        ctx.fillStyle = Math.random() > 0.5
-          ? "#e7b85c"
-          : "#43515f";
-
-        ctx.fillRect(wx, wy, 10, 10);
-      }
-    }
+    windows[i].forEach(win => {
+      ctx.fillStyle = win.color;
+      ctx.fillRect(win.x, win.y, 10, 10);
+    });
   });
 }
 
+// Draw the player character.
 function drawCharacter(x, y, color, size, label) {
   ctx.fillStyle = "#00000066";
   ctx.beginPath();
-  ctx.ellipse(x, y + size / 2, size * 0.7, size * 0.35,
-    0, 0, Math.PI * 2);
+  ctx.ellipse(
+    x, y + size / 2,
+    size * 0.7, size * 0.35,
+    0, 0, Math.PI * 2
+  );
   ctx.fill();
 
   ctx.fillStyle = color;
-  ctx.fillRect(x - size / 2, y - size / 2, size, size);
+  ctx.fillRect(
+    x - size / 2,
+    y - size / 2,
+    size,
+    size
+  );
 
   ctx.fillStyle = "#f1c7a2";
   ctx.beginPath();
-  ctx.arc(x, y - size / 2 - 5, size * 0.35, 0,
-    Math.PI * 2);
+  ctx.arc(
+    x, y - size / 2 - 5,
+    size * 0.35,
+    0, Math.PI * 2
+  );
   ctx.fill();
 
   ctx.fillStyle = "white";
@@ -381,6 +450,7 @@ function drawCharacter(x, y, color, size, label) {
   ctx.fillText(label, x, y - size);
 }
 
+// Draw the mission marker.
 function drawGoal() {
   if (missionComplete) return;
 
@@ -389,8 +459,11 @@ function drawGoal() {
   ctx.strokeStyle = "#f5a623";
   ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.arc(goal.x, goal.y, goal.size * pulse, 0,
-    Math.PI * 2);
+  ctx.arc(
+    goal.x, goal.y,
+    goal.size * pulse,
+    0, Math.PI * 2
+  );
   ctx.stroke();
 
   ctx.fillStyle = "#f5a623";
@@ -399,10 +472,10 @@ function drawGoal() {
   ctx.fillText("MISSION", goal.x, goal.y - 42);
 }
 
+// Draw the police car.
 function drawPolice() {
   if (!police.active) return;
 
-  // Police vehicle.
   ctx.fillStyle = "#d7dce3";
   ctx.fillRect(police.x - 19, police.y - 12, 38, 24);
 
@@ -414,10 +487,16 @@ function drawPolice() {
 
   ctx.fillStyle = "#9ee6ff";
   ctx.fillRect(police.x - 9, police.y - 7, 18, 14);
+
+  ctx.fillStyle = "white";
+  ctx.font = "11px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("POLICE", police.x, police.y - 19);
 }
 
+// Update player, camera, mission and police.
 function update() {
-  if (gameOver) return;
+  if (gameOver || message.style.display === "block") return;
 
   let dx = 0;
   let dy = 0;
@@ -444,6 +523,7 @@ function update() {
     Math.min(worldH - H, player.y - H / 2)
   );
 
+  // Complete the first mission.
   if (!missionComplete) {
     const distance = Math.hypot(
       player.x - goal.x,
@@ -463,13 +543,14 @@ function update() {
       messageTitle.textContent = "MISSION COMPLETE";
 
       messageText.textContent =
-        "You explored the city. Your next chapter " +
-        "begins with a police encounter.";
+        "You explored the city. Your next chapter begins " +
+        "with a police encounter.";
 
       message.style.display = "block";
     }
   }
 
+  // Police follow the player after the mission.
   if (police.active) {
     const distance = Math.hypot(
       player.x - police.x,
@@ -478,24 +559,30 @@ function update() {
 
     if (distance > 1) {
       police.x +=
-        (player.x - police.x) / distance * 0.8;
+        ((player.x - police.x) / distance) * 0.8;
 
       police.y +=
-        (player.y - police.y) / distance * 0.8;
+        ((player.y - police.y) / distance) * 0.8;
     }
 
     if (distance < 25) {
       gameOver = true;
+
       messageTitle.textContent = "ARRESTED";
+
       messageText.textContent =
         "You have been arrested. The prison chapter " +
         "will be part of our next update.";
+
+      document.getElementById("continue").textContent =
+        "RESTART GAME";
 
       message.style.display = "block";
     }
   }
 }
 
+// Draw the game world.
 function draw() {
   ctx.clearRect(0, 0, W, H);
 
@@ -518,14 +605,16 @@ function draw() {
   ctx.restore();
 }
 
+// Main game loop.
 function loop() {
   update();
   draw();
   requestAnimationFrame(loop);
 }
 
+// Mission button.
 document.getElementById("action").addEventListener("click", () => {
-  if (gameOver) return;
+  if (gameOver || message.style.display === "block") return;
 
   if (!missionComplete) {
     status.textContent = "Follow the orange mission marker!";
@@ -534,23 +623,32 @@ document.getElementById("action").addEventListener("click", () => {
   }
 });
 
+// Continue or restart.
 document.getElementById("continue").addEventListener("click", () => {
   if (gameOver) {
-    player.x = 180;
-    player.y = 180;
-    police.x = 850;
-    police.y = 850;
+    player.x = 280;
+    player.y = 280;
+
+    police.x = 750;
+    police.y = 750;
     police.active = false;
+
     missionComplete = false;
     gameOver = false;
 
     mission.textContent = "MISSION 1: Explore the city";
     status.textContent = "Location: United States";
+
+    document.getElementById("continue").textContent = "CONTINUE";
+
+    cameraX = 0;
+    cameraY = 0;
   }
 
   message.style.display = "none";
 });
 
+// Start the game.
 loop();
 </script>
 
