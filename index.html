@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0,
+maximum-scale=1.0,user-scalable=no">
+
+<title>Empire of Crime</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #080b10;
+  color: white;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100dvh;
+  background: #171c22;
+}
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  padding: 12px;
+  background: #080b10dd;
+  border: 1px solid #343b46;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+#hud h2 {
+  margin: 0 0 5px;
+  color: #f5a623;
+  font-size: 19px;
+}
+
+#mission {
+  font-size: 13px;
+  color: #d5d9df;
+}
+
+#controls {
+  position: absolute;
+  bottom: 25px;
+  left: 20px;
+  display: grid;
+  grid-template-columns: 55px 55px 55px;
+  grid-template-rows: 55px 55px;
+  gap: 5px;
+}
+
+button {
+  border: 1px solid #697383;
+  border-radius: 12px;
+  background: #202833eF;
+  color: white;
+  font-size: 23px;
+  touch-action: none;
+}
+
+button:active {
+  background: #f5a623;
+  color: #111;
+}
+
+#up {
+  grid-column: 2;
+}
+
+#left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+#down {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+#right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+#action {
+  position: absolute;
+  right: 20px;
+  bottom: 48px;
+  width: 90px;
+  height: 65px;
+  font-size: 13px;
+  font-weight: bold;
+  background: #a62a2a;
+}
+
+#message {
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  top: 43%;
+  padding: 20px;
+  text-align: center;
+  border-radius: 15px;
+  background: #080b10f2;
+  border: 1px solid #f5a623;
+  display: none;
+}
+
+#message h2 {
+  color: #f5a623;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <h2>EMPIRE OF CRIME</h2>
+  <div id="mission">MISSION 1: Explore the city</div>
+  <div id="status">Location: United States</div>
+</div>
+
+<div id="controls">
+  <button id="up" aria-label="Move up">▲</button>
+  <button id="left" aria-label="Move left">◀</button>
+  <button id="down" aria-label="Move down">▼</button>
+  <button id="right" aria-label="Move right">▶</button>
+</div>
+
+<button id="action">MISSION</button>
+
+<div id="message">
+  <h2 id="messageTitle">MISSION COMPLETE</h2>
+  <p id="messageText"></p>
+  <button id="continue">CONTINUE</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const mission = document.getElementById("mission");
+const status = document.getElementById("status");
+const message = document.getElementById("message");
+const messageTitle = document.getElementById("messageTitle");
+const messageText = document.getElementById("messageText");
+
+let W, H;
+let worldW = 1800;
+let worldH = 1800;
+
+const player = {
+  x: 180,
+  y: 180,
+  size: 22,
+  speed: 3
+};
+
+const police = {
+  x: 850,
+  y: 850,
+  size: 25,
+  active: false
+};
+
+let cameraX = 0;
+let cameraY = 0;
+let missionComplete = false;
+let gameOver = false;
+
+const keys = {};
+const buildings = [];
+
+function resize() {
+  W = canvas.width = window.innerWidth *
+      Math.min(window.devicePixelRatio || 1, 2);
+  H = canvas.height = window.innerHeight *
+      Math.min(window.devicePixelRatio || 1, 2);
+
+  canvas.style.width = window.innerWidth + "px";
+  canvas.style.height = window.innerHeight + "px";
+
+  ctx.setTransform(
+    Math.min(window.devicePixelRatio || 1, 2),
+    0, 0,
+    Math.min(window.devicePixelRatio || 1, 2),
+    0, 0
+  );
+
+  W = window.innerWidth;
+  H = window.innerHeight;
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+// Generate city blocks.
+for (let x = 80; x < worldW; x += 240) {
+  for (let y = 80; y < worldH; y += 240) {
+    buildings.push({
+      x: x + 35,
+      y: y + 35,
+      w: 125,
+      h: 125,
+      shade: Math.random() > 0.5 ? "#303741" : "#262e38"
+    });
+  }
+}
+
+const goal = {
+  x: 1100,
+  y: 300,
+  size: 27
+};
+
+function setKey(key, value) {
+  keys[key] = value;
+}
+
+document.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+
+  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "]
+      .includes(k)) {
+    e.preventDefault();
+  }
+
+  setKey(k, true);
+});
+
+document.addEventListener("keyup", e => {
+  setKey(e.key.toLowerCase(), false);
+});
+
+function bindButton(id, key) {
+  const button = document.getElementById(id);
+
+  button.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    setKey(key, true);
+    button.setPointerCapture(e.pointerId);
+  });
+
+  function release(e) {
+    e.preventDefault();
+    setKey(key, false);
+  }
+
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("lostpointercapture", () => {
+    setKey(key, false);
+  });
+}
+
+bindButton("up", "arrowup");
+bindButton("down", "arrowdown");
+bindButton("left", "arrowleft");
+bindButton("right", "arrowright");
+
+function collides(x, y, size) {
+  return buildings.some(b =>
+    x + size / 2 > b.x &&
+    x - size / 2 < b.x + b.w &&
+    y + size / 2 > b.y &&
+    y - size / 2 < b.y + b.h
+  );
+}
+
+function movePlayer(dx, dy) {
+  const nx = Math.max(
+    player.size,
+    Math.min(worldW - player.size, player.x + dx)
+  );
+
+  const ny = Math.max(
+    player.size,
+    Math.min(worldH - player.size, player.y + dy)
+  );
+
+  if (!collides(nx, player.y, player.size)) {
+    player.x = nx;
+  }
+
+  if (!collides(player.x, ny, player.size)) {
+    player.y = ny;
+  }
+}
+
+function drawRoads() {
+  ctx.fillStyle = "#20262c";
+  ctx.fillRect(0, 0, worldW, worldH);
+
+  // Road grid.
+  for (let x = 0; x < worldW; x += 240) {
+    ctx.fillStyle = "#383e43";
+    ctx.fillRect(x, 0, 65, worldH);
+
+    ctx.strokeStyle = "#a5a5a555";
+    ctx.setLineDash([16, 18]);
+    ctx.beginPath();
+    ctx.moveTo(x + 32, 0);
+    ctx.lineTo(x + 32, worldH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  for (let y = 0; y < worldH; y += 240) {
+    ctx.fillStyle = "#383e43";
+    ctx.fillRect(0, y, worldW, 65);
+
+    ctx.strokeStyle = "#a5a5a555";
+    ctx.setLineDash([16, 18]);
+    ctx.beginPath();
+    ctx.moveTo(0, y + 32);
+    ctx.lineTo(worldW, y + 32);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawBuildings() {
+  buildings.forEach(b => {
+    ctx.fillStyle = "#00000055";
+    ctx.fillRect(b.x + 7, b.y + 7, b.w, b.h);
+
+    ctx.fillStyle = b.shade;
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+
+    ctx.strokeStyle = "#626d7a";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+    // Lit windows.
+    for (let wx = b.x + 14; wx < b.x + b.w - 10; wx += 27) {
+      for (let wy = b.y + 15; wy < b.y + b.h - 10; wy += 28) {
+        ctx.fillStyle = Math.random() > 0.5
+          ? "#e7b85c"
+          : "#43515f";
+
+        ctx.fillRect(wx, wy, 10, 10);
+      }
+    }
+  });
+}
+
+function drawCharacter(x, y, color, size, label) {
+  ctx.fillStyle = "#00000066";
+  ctx.beginPath();
+  ctx.ellipse(x, y + size / 2, size * 0.7, size * 0.35,
+    0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = color;
+  ctx.fillRect(x - size / 2, y - size / 2, size, size);
+
+  ctx.fillStyle = "#f1c7a2";
+  ctx.beginPath();
+  ctx.arc(x, y - size / 2 - 5, size * 0.35, 0,
+    Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "white";
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(label, x, y - size);
+}
+
+function drawGoal() {
+  if (missionComplete) return;
+
+  const pulse = 1 + Math.sin(Date.now() / 200) * 0.12;
+
+  ctx.strokeStyle = "#f5a623";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(goal.x, goal.y, goal.size * pulse, 0,
+    Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "#f5a623";
+  ctx.font = "bold 14px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("MISSION", goal.x, goal.y - 42);
+}
+
+function drawPolice() {
+  if (!police.active) return;
+
+  // Police vehicle.
+  ctx.fillStyle = "#d7dce3";
+  ctx.fillRect(police.x - 19, police.y - 12, 38, 24);
+
+  ctx.fillStyle = "#245db4";
+  ctx.fillRect(police.x - 19, police.y - 12, 13, 24);
+
+  ctx.fillStyle = "#d84141";
+  ctx.fillRect(police.x + 6, police.y - 12, 13, 24);
+
+  ctx.fillStyle = "#9ee6ff";
+  ctx.fillRect(police.x - 9, police.y - 7, 18, 14);
+}
+
+function update() {
+  if (gameOver) return;
+
+  let dx = 0;
+  let dy = 0;
+
+  if (keys["arrowup"] || keys["w"]) dy -= player.speed;
+  if (keys["arrowdown"] || keys["s"]) dy += player.speed;
+  if (keys["arrowleft"] || keys["a"]) dx -= player.speed;
+  if (keys["arrowright"] || keys["d"]) dx += player.speed;
+
+  if (dx && dy) {
+    dx *= 0.707;
+    dy *= 0.707;
+  }
+
+  movePlayer(dx, dy);
+
+  cameraX = Math.max(
+    0,
+    Math.min(worldW - W, player.x - W / 2)
+  );
+
+  cameraY = Math.max(
+    0,
+    Math.min(worldH - H, player.y - H / 2)
+  );
+
+  if (!missionComplete) {
+    const distance = Math.hypot(
+      player.x - goal.x,
+      player.y - goal.y
+    );
+
+    if (distance < 45) {
+      missionComplete = true;
+      police.active = true;
+
+      mission.textContent =
+        "MISSION 1 COMPLETE: Your story begins";
+
+      status.textContent =
+        "New objective: Meet the police encounter";
+
+      messageTitle.textContent = "MISSION COMPLETE";
+
+      messageText.textContent =
+        "You explored the city. Your next chapter " +
+        "begins with a police encounter.";
+
+      message.style.display = "block";
+    }
+  }
+
+  if (police.active) {
+    const distance = Math.hypot(
+      player.x - police.x,
+      player.y - police.y
+    );
+
+    if (distance > 1) {
+      police.x +=
+        (player.x - police.x) / distance * 0.8;
+
+      police.y +=
+        (player.y - police.y) / distance * 0.8;
+    }
+
+    if (distance < 25) {
+      gameOver = true;
+      messageTitle.textContent = "ARRESTED";
+      messageText.textContent =
+        "You have been arrested. The prison chapter " +
+        "will be part of our next update.";
+
+      message.style.display = "block";
+    }
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(-cameraX, -cameraY);
+
+  drawRoads();
+  drawBuildings();
+  drawGoal();
+  drawPolice();
+
+  drawCharacter(
+    player.x,
+    player.y,
+    "#f5a623",
+    player.size,
+    "YOU"
+  );
+
+  ctx.restore();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.getElementById("action").addEventListener("click", () => {
+  if (gameOver) return;
+
+  if (!missionComplete) {
+    status.textContent = "Follow the orange mission marker!";
+  } else {
+    status.textContent = "Explore the city. Watch for police!";
+  }
+});
+
+document.getElementById("continue").addEventListener("click", () => {
+  if (gameOver) {
+    player.x = 180;
+    player.y = 180;
+    police.x = 850;
+    police.y = 850;
+    police.active = false;
+    missionComplete = false;
+    gameOver = false;
+
+    mission.textContent = "MISSION 1: Explore the city";
+    status.textContent = "Location: United States";
+  }
+
+  message.style.display = "none";
+});
+
+loop();
+</script>
+
+</body>
+</html>
