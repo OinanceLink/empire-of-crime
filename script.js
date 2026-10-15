@@ -201,52 +201,43 @@
         keys[event.key.toLowerCase()] = false;
     });
 
-    // MOBILE CONTROL BUTTONS
-    controls.innerHTML = `
-        <div class="control-group">
-            <button class="game-btn" data-key="a">◀</button>
-            <button class="game-btn" data-key="d">▶</button>
-        </div>
+    
+// MOBILE CONTROL BUTTONS
+controls.innerHTML = `
+    <div class="control-group">
+        <button class="game-btn" data-key="a">◀</button>
+        <button class="game-btn" data-key="d">▶</button>
+    </div>
 
-        <div class="control-group">
-            <button class="game-btn action" id="enter-btn">ENTER</button>
-            <button class="game-btn gas" data-key="w">▲</button>
-            <button class="game-btn brake" data-key="s">▼</button>
-            <button class="game-btn action" id="garage-btn">GARAGE</button>
-        </div>
-    `;
+    <div class="control-group">
+        <button class="game-btn action" id="enter-btn">ENTER</button>
+        <button class="game-btn gas" data-key="w">▲</button>
+        <button class="game-btn brake" data-key="s">▼</button>
+        <button class="game-btn action" id="garage-btn">GARAGE</button>
+    </div>
+`;
 
-    controls.querySelectorAll("[data-key]").forEach(button => {
-        const key = button.dataset.key;
+controls.querySelectorAll("[data-key]").forEach(button => {
+    const key = button.dataset.key;
 
-        button.addEventListener("pointerdown", event => {
-            event.preventDefault();
-            keys[key] = true;
-
-            try {
-                button.setPointerCapture(event.pointerId);
-            } catch (_) {}
-        });
-
-        const release = () => {
-            keys[key] = false;
-        };
-
-        button.addEventListener("pointerup", release);
-        button.addEventListener("pointercancel", release);
-        button.addEventListener("lostpointercapture", release);
+    button.addEventListener("pointerdown", event => {
+        event.preventDefault();
+        keys[key] = true;
     });
 
-    document.getElementById("enter-btn").addEventListener(
-        "click",
-        toggleVehicle
-    );
+    function releaseKey(event) {
+        event.preventDefault();
+        keys[key] = false;
+    }
 
-    document.getElementById("garage-btn").addEventListener(
-        "click",
-        toggleGarage
-    );
+    button.addEventListener("pointerup", releaseKey);
+    button.addEventListener("pointercancel", releaseKey);
+    button.addEventListener("pointerleave", releaseKey);
+});
 
+document.getElementById("enter-btn").onclick = toggleVehicle;
+document.getElementById("garage-btn").onclick = toggleGarage;
+    
     // CITY BUILDINGS
     const buildings = [];
 
