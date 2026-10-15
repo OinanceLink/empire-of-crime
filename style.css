@@ -275,3 +275,25 @@ canvas {
         width: 105px;
     }
 }
+
+#controls {
+    z-index: 100;
+    pointer-events: none;
+}
+
+#controls .control-group,
+#controls .game-btn {
+    pointer-events: auto;
+    touch-action: none;
+}
+
+#garage-panel {
+    z-index: 200;
+}
+
+#hud,
+#speedometer,
+#fuel-box,
+#message {
+    z-index: 10;
+}
