@@ -1,522 +1,895 @@
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+// =======================================
+// EMPIRE OF CRIME
+// GTA-STYLE OPEN WORLD GAME
+// =======================================
 
-const mission = document.getElementById("mission");
-const status = document.getElementById("status");
-const message = document.getElementById("message");
-const messageTitle = document.getElementById("messageTitle");
-const messageText = document.getElementById("messageText");
+(() => {
+    "use strict";
 
-let W = window.innerWidth;
-let H = window.innerHeight;
+    // GAME SETTINGS
+    const WORLD = {
+        width: 2600,
+        height: 2600,
+        roadWidth: 150,
+        blockSize: 400
+    };
 
-const worldW = 1800;
-const worldH = 1800;
+    const game = {
+        money: 2500,
+        wanted: 0,
+        fuel: 100,
+        speed: 0,
+        inCar: false,
+        garageOpen: false,
+        message: "Welcome to Empire of Crime!",
+        messageTime: 4
+    };
 
-const player = {
-  x: 180,
-  y: 180,
-  size: 22,
-  speed: 3
-};
+    // CREATE GAME CONTAINER
+    let container = document.getElementById("game-container");
 
-const police = {
-  x: 850,
-  y: 850,
-  size: 25,
-  active: false
-};
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "game-container";
+        document.body.appendChild(container);
+    }
 
-let cameraX = 0;
-let cameraY = 0;
+    // CREATE CANVAS
+    let canvas = document.getElementById("gameCanvas");
 
-let missionComplete = false;
-let gameOver = false;
+    if (!canvas) {
+        canvas = document.querySelector("canvas");
+    }
 
-const keys = {};
-const buildings = [];
+    if (!canvas) {
+        canvas = document.createElement("canvas");
+        canvas.id = "gameCanvas";
+        container.appendChild(canvas);
+    }
 
-const goal = {
-  x: 1100,
-  y: 300,
-  size: 27
-};
+    const ctx = canvas.getContext("2d");
 
-// Set canvas dimensions.
-function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // CREATE HUD
+    function createElement(id, tag = "div") {
+        let element = document.getElementById(id);
 
-  W = window.innerWidth;
-  H = window.innerHeight;
+        if (!element) {
+            element = document.createElement(tag);
+            element.id = id;
+            container.appendChild(element);
+        }
 
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
+        return element;
+    }
 
-  canvas.style.width = W + "px";
-  canvas.style.height = H + "px";
+    const hud = createElement("hud");
+    const speedDisplay = createElement("speed");
+    const fuelFill = createElement("fuel-fill");
+    const messageDisplay = createElement("message");
+    const controls = createElement("controls");
+    const garagePanel = createElement("garage-panel");
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
+    hud.innerHTML = `
+        <div class="hud-panel">
+            <div class="game-title">EMPIRE OF CRIME</div>
+            <div class="hud-text">Cash: $<span id="money">2500</span></div>
+            <div class="hud-text">Wanted: <span id="wanted" class="wanted">☆☆☆☆☆</span></div>
+        </div>
+    `;
 
-window.addEventListener("resize", resize);
-resize();
+    // SPEEDOMETER
+    const speedometer = createElement("speedometer");
 
-// Create the city buildings.
-for (let x = 80; x < worldW; x += 240) {
-  for (let y = 80; y < worldH; y += 240) {
-    buildings.push({
-      x: x + 35,
-      y: y + 35,
-      w: 125,
-      h: 125,
-      shade: Math.random() > 0.5
-        ? "#303741"
-        : "#262e38"
+    speedometer.innerHTML = `
+        <div id="speed">0</div>
+        <div class="speed-label">KM/H</div>
+    `;
+
+    // FUEL DISPLAY
+    const fuelBox = createElement("fuel-box");
+
+    fuelBox.innerHTML = `
+        <div class="fuel-label">
+            FUEL <span id="fuel-percent">100%</span>
+        </div>
+        <div class="fuel-track">
+            <div id="fuel-fill"></div>
+        </div>
+    `;
+
+    const moneyDisplay = document.getElementById("money");
+    const wantedDisplay = document.getElementById("wanted");
+    const fuelPercent = document.getElementById("fuel-percent");
+
+    // PLAYER
+    const player = {
+        x: 350,
+        y: 350,
+        angle: 0,
+        radius: 12,
+        walkingSpeed: 190
+    };
+
+    // VEHICLE TYPES
+    const carTypes = [
+        {
+            name: "Street Car",
+            color: "#e63946",
+            speed: 340,
+            price: 0,
+            fuel: 100
+        },
+        {
+            name: "Sports Car",
+            color: "#ffca3a",
+            speed: 470,
+            price: 800,
+            fuel: 100
+        },
+        {
+            name: "Super Car",
+            color: "#8338ec",
+            speed: 570,
+            price: 1800,
+            fuel: 100
+        },
+        {
+            name: "Off-Roader",
+            color: "#38b000",
+            speed: 300,
+            price: 1200,
+            fuel: 100
+        }
+    ];
+
+    // CREATE VEHICLES
+    const cars = [];
+
+    function createCar(type, x, y, angle = 0) {
+        const car = {
+            type: type,
+            x: x,
+            y: y,
+            angle: angle,
+            speed: 0,
+            fuel: 100,
+            width: 30,
+            height: 52,
+            occupied: false
+        };
+
+        cars.push(car);
+        return car;
+    }
+
+    createCar(0, 450, 350, Math.PI / 2);
+    createCar(1, 750, 350, Math.PI / 2);
+    createCar(2, 1050, 350, Math.PI / 2);
+    createCar(3, 1450, 350, Math.PI / 2);
+    createCar(0, 450, 750, 0);
+    createCar(1, 850, 750, 0);
+    createCar(2, 1250, 750, 0);
+    createCar(3, 1650, 750, 0);
+
+    let currentCar = null;
+
+    // INPUT
+    const keys = {};
+
+    window.addEventListener("keydown", event => {
+        keys[event.key.toLowerCase()] = true;
+
+        if (
+            ["arrowup", "arrowdown", "arrowleft", "arrowright", " "]
+                .includes(event.key.toLowerCase())
+        ) {
+            event.preventDefault();
+        }
+
+        if (event.repeat) return;
+
+        if (event.key.toLowerCase() === "e") {
+            toggleVehicle();
+        }
+
+        if (event.key.toLowerCase() === "g") {
+            toggleGarage();
+        }
     });
-  }
-}
 
-// Keyboard controls.
-document.addEventListener("keydown", event => {
-  const key = event.key.toLowerCase();
+    window.addEventListener("keyup", event => {
+        keys[event.key.toLowerCase()] = false;
+    });
 
-  if (
-    ["arrowup", "arrowdown", "arrowleft", "arrowright", " "]
-      .includes(key)
-  ) {
-    event.preventDefault();
-  }
+    // MOBILE CONTROL BUTTONS
+    controls.innerHTML = `
+        <div class="control-group">
+            <button class="game-btn" data-key="a">◀</button>
+            <button class="game-btn" data-key="d">▶</button>
+        </div>
 
-  keys[key] = true;
-});
+        <div class="control-group">
+            <button class="game-btn action" id="enter-btn">ENTER</button>
+            <button class="game-btn gas" data-key="w">▲</button>
+            <button class="game-btn brake" data-key="s">▼</button>
+            <button class="game-btn action" id="garage-btn">GARAGE</button>
+        </div>
+    `;
 
-document.addEventListener("keyup", event => {
-  keys[event.key.toLowerCase()] = false;
-});
+    controls.querySelectorAll("[data-key]").forEach(button => {
+        const key = button.dataset.key;
 
-// Mobile touch controls.
-function bindButton(id, key) {
-  const button = document.getElementById(id);
+        button.addEventListener("pointerdown", event => {
+            event.preventDefault();
+            keys[key] = true;
 
-  button.addEventListener("pointerdown", event => {
-    event.preventDefault();
-    keys[key] = true;
-    button.setPointerCapture(event.pointerId);
-  });
+            try {
+                button.setPointerCapture(event.pointerId);
+            } catch (_) {}
+        });
 
-  function release(event) {
-    event.preventDefault();
-    keys[key] = false;
-  }
+        const release = () => {
+            keys[key] = false;
+        };
 
-  button.addEventListener("pointerup", release);
-  button.addEventListener("pointercancel", release);
+        button.addEventListener("pointerup", release);
+        button.addEventListener("pointercancel", release);
+        button.addEventListener("lostpointercapture", release);
+    });
 
-  button.addEventListener("lostpointercapture", () => {
-    keys[key] = false;
-  });
-}
-
-bindButton("up", "arrowup");
-bindButton("down", "arrowdown");
-bindButton("left", "arrowleft");
-bindButton("right", "arrowright");
-
-// Detect collisions with buildings.
-function collides(x, y, size) {
-  return buildings.some(building =>
-    x + size / 2 > building.x &&
-    x - size / 2 < building.x + building.w &&
-    y + size / 2 > building.y &&
-    y - size / 2 < building.y + building.h
-  );
-}
-
-// Move the player.
-function movePlayer(dx, dy) {
-  const nextX = Math.max(
-    player.size,
-    Math.min(worldW - player.size, player.x + dx)
-  );
-
-  const nextY = Math.max(
-    player.size,
-    Math.min(worldH - player.size, player.y + dy)
-  );
-
-  if (!collides(nextX, player.y, player.size)) {
-    player.x = nextX;
-  }
-
-  if (!collides(player.x, nextY, player.size)) {
-    player.y = nextY;
-  }
-}
-
-// Draw city roads.
-function drawRoads() {
-  ctx.fillStyle = "#20262c";
-  ctx.fillRect(0, 0, worldW, worldH);
-
-  for (let x = 0; x < worldW; x += 240) {
-    ctx.fillStyle = "#383e43";
-    ctx.fillRect(x, 0, 65, worldH);
-
-    ctx.strokeStyle = "#a5a5a555";
-    ctx.setLineDash([16, 18]);
-
-    ctx.beginPath();
-    ctx.moveTo(x + 32, 0);
-    ctx.lineTo(x + 32, worldH);
-    ctx.stroke();
-
-    ctx.setLineDash([]);
-  }
-
-  for (let y = 0; y < worldH; y += 240) {
-    ctx.fillStyle = "#383e43";
-    ctx.fillRect(0, y, worldW, 65);
-
-    ctx.strokeStyle = "#a5a5a555";
-    ctx.setLineDash([16, 18]);
-
-    ctx.beginPath();
-    ctx.moveTo(0, y + 32);
-    ctx.lineTo(worldW, y + 32);
-    ctx.stroke();
-
-    ctx.setLineDash([]);
-  }
-}
-
-// Draw buildings and windows.
-function drawBuildings() {
-  buildings.forEach(building => {
-    ctx.fillStyle = "#00000055";
-
-    ctx.fillRect(
-      building.x + 7,
-      building.y + 7,
-      building.w,
-      building.h
+    document.getElementById("enter-btn").addEventListener(
+        "click",
+        toggleVehicle
     );
 
-    ctx.fillStyle = building.shade;
-
-    ctx.fillRect(
-      building.x,
-      building.y,
-      building.w,
-      building.h
+    document.getElementById("garage-btn").addEventListener(
+        "click",
+        toggleGarage
     );
 
-    ctx.strokeStyle = "#626d7a";
-    ctx.lineWidth = 2;
+    // CITY BUILDINGS
+    const buildings = [];
 
-    ctx.strokeRect(
-      building.x,
-      building.y,
-      building.w,
-      building.h
-    );
+    function generateCity() {
+        buildings.length = 0;
 
-    for (
-      let wx = building.x + 14;
-      wx < building.x + building.w - 10;
-      wx += 27
-    ) {
-      for (
-        let wy = building.y + 15;
-        wy < building.y + building.h - 10;
-        wy += 28
-      ) {
-        ctx.fillStyle = Math.random() > 0.5
-          ? "#e7b85c"
-          : "#43515f";
-
-        ctx.fillRect(wx, wy, 10, 10);
-      }
-    }
-  });
-}
-
-// Draw a character.
-function drawCharacter(x, y, color, size, label) {
-  ctx.fillStyle = "#00000066";
-
-  ctx.beginPath();
-
-  ctx.ellipse(
-    x,
-    y + size / 2,
-    size * 0.7,
-    size * 0.35,
-    0,
-    0,
-    Math.PI * 2
-  );
-
-  ctx.fill();
-
-  ctx.fillStyle = color;
-
-  ctx.fillRect(
-    x - size / 2,
-    y - size / 2,
-    size,
-    size
-  );
-
-  ctx.fillStyle = "#f1c7a2";
-
-  ctx.beginPath();
-
-  ctx.arc(
-    x,
-    y - size / 2 - 5,
-    size * 0.35,
-    0,
-    Math.PI * 2
-  );
-
-  ctx.fill();
-
-  ctx.fillStyle = "white";
-  ctx.font = "12px Arial";
-  ctx.textAlign = "center";
-
-  ctx.fillText(label, x, y - size);
-}
-
-// Draw the mission marker.
-function drawGoal() {
-  if (missionComplete) return;
-
-  const pulse = 1 + Math.sin(Date.now() / 200) * 0.12;
-
-  ctx.strokeStyle = "#f5a623";
-  ctx.lineWidth = 4;
-
-  ctx.beginPath();
-
-  ctx.arc(
-    goal.x,
-    goal.y,
-    goal.size * pulse,
-    0,
-    Math.PI * 2
-  );
-
-  ctx.stroke();
-
-  ctx.fillStyle = "#f5a623";
-  ctx.font = "bold 14px Arial";
-  ctx.textAlign = "center";
-
-  ctx.fillText("MISSION", goal.x, goal.y - 42);
-}
-
-// Draw the police vehicle.
-function drawPolice() {
-  if (!police.active) return;
-
-  ctx.fillStyle = "#d7dce3";
-
-  ctx.fillRect(
-    police.x - 19,
-    police.y - 12,
-    38,
-    24
-  );
-
-  ctx.fillStyle = "#245db4";
-
-  ctx.fillRect(
-    police.x - 19,
-    police.y - 12,
-    13,
-    24
-  );
-
-  ctx.fillStyle = "#d84141";
-
-  ctx.fillRect(
-    police.x + 6,
-    police.y - 12,
-    13,
-    24
-  );
-
-  ctx.fillStyle = "#9ee6ff";
-
-  ctx.fillRect(
-    police.x - 9,
-    police.y - 7,
-    18,
-    14
-  );
-}
-
-// Update the game.
-function update() {
-  if (gameOver) return;
-
-  let dx = 0;
-  let dy = 0;
-
-  if (keys["arrowup"] || keys["w"]) {
-    dy -= player.speed;
-  }
-
-  if (keys["arrowdown"] || keys["s"]) {
-    dy += player.speed;
-  }
-
-  if (keys["arrowleft"] || keys["a"]) {
-    dx -= player.speed;
-  }
-
-  if (keys["arrowright"] || keys["d"]) {
-    dx += player.speed;
-  }
-
-  if (dx !== 0 && dy !== 0) {
-    dx *= 0.707;
-    dy *= 0.707;
-  }
-
-  movePlayer(dx, dy);
-
-  // Follow the player with the camera.
-  cameraX = Math.max(
-    0,
-    Math.min(worldW - W, player.x - W / 2)
-  );
-
-  cameraY = Math.max(
-    0,
-    Math.min(worldH - H, player.y - H / 2)
-  );
-
-  // Complete the first mission.
-  if (!missionComplete) {
-    const distance = Math.hypot(
-      player.x - goal.x,
-      player.y - goal.y
-    );
-
-    if (distance < 45) {
-      missionComplete = true;
-      police.active = true;
-
-      mission.textContent =
-        "MISSION 1 COMPLETE: Your story begins";
-
-      status.textContent =
-        "New objective: Face the police encounter";
-
-      messageTitle.textContent = "MISSION COMPLETE";
-
-      messageText.textContent =
-        "You explored the city. Your next chapter " +
-        "begins with a police encounter.";
-
-      message.style.display = "block";
-    }
-  }
-
-  // The fictional police encounter.
-  if (police.active) {
-    const distance = Math.hypot(
-      player.x - police.x,
-      player.y - police.y
-    );
-
-    if (distance > 1) {
-      police.x +=
-        ((player.x - police.x) / distance) * 0.8;
-
-      police.y +=
-        ((player.y - police.y) / distance) * 0.8;
+        for (let x = 0; x < WORLD.width; x += WORLD.blockSize) {
+            for (let y = 0; y < WORLD.height; y += WORLD.blockSize) {
+                buildings.push({
+                    x: x + WORLD.roadWidth,
+                    y: y + WORLD.roadWidth,
+                    width: WORLD.blockSize - WORLD.roadWidth - 20,
+                    height: WORLD.blockSize - WORLD.roadWidth - 20,
+                    color: [
+                        "#535b61",
+                        "#66605a",
+                        "#4b5962",
+                        "#686868",
+                        "#4c554f"
+                    ][Math.floor(Math.random() * 5)]
+                });
+            }
+        }
     }
 
-    if (distance < 25) {
-      gameOver = true;
+    generateCity();
 
-      messageTitle.textContent = "ARRESTED";
+    // DRAW CITY
+    function drawCity(cameraX, cameraY) {
+        ctx.fillStyle = "#426b45";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      messageText.textContent =
-        "You have been arrested. The prison chapter " +
-        "will arrive in a future update.";
+        ctx.save();
 
-      message.style.display = "block";
+        ctx.translate(-cameraX, -cameraY);
+
+        // ROADS
+        ctx.fillStyle = "#303438";
+
+        for (let x = 0; x < WORLD.width; x += WORLD.blockSize) {
+            ctx.fillRect(
+                x,
+                0,
+                WORLD.roadWidth,
+                WORLD.height
+            );
+        }
+
+        for (let y = 0; y < WORLD.height; y += WORLD.blockSize) {
+            ctx.fillRect(
+                0,
+                y,
+                WORLD.width,
+                WORLD.roadWidth
+            );
+        }
+
+        // ROAD MARKINGS
+        ctx.strokeStyle = "#b8b4a0";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([22, 24]);
+
+        for (let x = 0; x < WORLD.width; x += WORLD.blockSize) {
+            ctx.beginPath();
+            ctx.moveTo(x + WORLD.roadWidth / 2, 0);
+            ctx.lineTo(
+                x + WORLD.roadWidth / 2,
+                WORLD.height
+            );
+            ctx.stroke();
+        }
+
+        for (let y = 0; y < WORLD.height; y += WORLD.blockSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y + WORLD.roadWidth / 2);
+            ctx.lineTo(
+                WORLD.width,
+                y + WORLD.roadWidth / 2
+            );
+            ctx.stroke();
+        }
+
+        ctx.setLineDash([]);
+
+        // BUILDINGS
+        buildings.forEach(building => {
+            ctx.fillStyle = "#202723";
+            ctx.fillRect(
+                building.x + 7,
+                building.y + 7,
+                building.width,
+                building.height
+            );
+
+            ctx.fillStyle = building.color;
+            ctx.fillRect(
+                building.x,
+                building.y,
+                building.width,
+                building.height
+            );
+
+            // Rooftop details
+            ctx.fillStyle = "#777b77";
+
+            ctx.fillRect(
+                building.x + 20,
+                building.y + 20,
+                30,
+                25
+            );
+
+            ctx.fillStyle = "#b2a77b";
+
+            for (
+                let wx = building.x + 20;
+                wx < building.x + building.width - 15;
+                wx += 45
+            ) {
+                ctx.fillRect(wx, building.y + 65, 16, 5);
+            }
+        });
+
+        // GARAGE LOCATION
+        ctx.fillStyle = "#111";
+        ctx.fillRect(175, 175, 120, 100);
+
+        ctx.fillStyle = "#f5bd38";
+        ctx.font = "bold 18px Arial";
+        ctx.fillText("GARAGE", 193, 220);
+
+        ctx.restore();
     }
-  }
-}
 
-// Render the scene.
-function draw() {
-  ctx.clearRect(0, 0, W, H);
+    // DRAW VEHICLES
+    function drawCar(car, cameraX, cameraY) {
+        const screenX = car.x - cameraX;
+        const screenY = car.y - cameraY;
 
-  ctx.save();
+        ctx.save();
 
-  ctx.translate(-cameraX, -cameraY);
+        ctx.translate(screenX, screenY);
+        ctx.rotate(car.angle);
 
-  drawRoads();
-  drawBuildings();
-  drawGoal();
-  drawPolice();
+        // Car shadow
+        ctx.fillStyle = "#0008";
+        ctx.fillRect(-car.width / 2 + 3, -car.height / 2 + 4,
+            car.width, car.height);
 
-  drawCharacter(
-    player.x,
-    player.y,
-    "#f5a623",
-    player.size,
-    "YOU"
-  );
+        // Body
+        ctx.fillStyle = carTypes[car.type].color;
+        ctx.fillRect(
+            -car.width / 2,
+            -car.height / 2,
+            car.width,
+            car.height
+        );
 
-  ctx.restore();
-}
+        // Windows
+        ctx.fillStyle = "#a9d9e9";
 
-// Start the game loop.
-function loop() {
-  update();
-  draw();
+        ctx.fillRect(-car.width / 2 + 4, -car.height / 2 + 8,
+            car.width - 8, 12);
 
-  requestAnimationFrame(loop);
-}
+        ctx.fillRect(-car.width / 2 + 4, 5,
+            car.width - 8, 10);
 
-// Mission button.
-document.getElementById("action").addEventListener("click", () => {
-  if (gameOver) return;
+        // Headlights
+        ctx.fillStyle = "#fff5a8";
 
-  if (!missionComplete) {
-    status.textContent =
-      "Follow the orange mission marker!";
-  } else {
-    status.textContent =
-      "Explore the city. Watch for police!";
-  }
-});
+        ctx.fillRect(-car.width / 2 + 2, -car.height / 2, 7, 4);
+        ctx.fillRect(car.width / 2 - 9, -car.height / 2, 7, 4);
 
-// Continue or restart.
-document.getElementById("continue").addEventListener("click", () => {
-  if (gameOver) {
-    player.x = 180;
-    player.y = 180;
+        // Tail lights
+        ctx.fillStyle = "#ff3434";
 
-    police.x = 850;
-    police.y = 850;
-    police.active = false;
+        ctx.fillRect(-car.width / 2 + 2, car.height / 2 - 4, 7, 4);
+        ctx.fillRect(car.width / 2 - 9, car.height / 2 - 4, 7, 4);
 
-    missionComplete = false;
-    gameOver = false;
+        ctx.restore();
+    }
 
-    mission.textContent = "MISSION 1: Explore the city";
-    status.textContent = "Location: United States";
-  }
+    // DRAW PLAYER
+    function drawPlayer(cameraX, cameraY) {
+        if (game.inCar) return;
 
-  message.style.display = "none";
-});
+        const x = player.x - cameraX;
+        const y = player.y - cameraY;
 
-loop();
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(player.angle);
+
+        ctx.fillStyle = "#111";
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#f5bd38";
+        ctx.beginPath();
+        ctx.arc(0, 0, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#222";
+        ctx.fillRect(-4, -4, 8, 10);
+
+        ctx.restore();
+    }
+
+    // VEHICLE ENTRY AND EXIT
+    function toggleVehicle() {
+        if (game.inCar) {
+            player.x = currentCar.x + 45;
+            player.y = currentCar.y;
+
+            currentCar.occupied = false;
+            currentCar.speed = 0;
+
+            currentCar = null;
+            game.inCar = false;
+            game.speed = 0;
+
+            showMessage("You exited the vehicle.");
+            return;
+        }
+
+        let nearestCar = null;
+        let nearestDistance = 65;
+
+        cars.forEach(car => {
+            if (car.occupied) return;
+
+            const distance = Math.hypot(
+                car.x - player.x,
+                car.y - player.y
+            );
+
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestCar = car;
+            }
+        });
+
+        if (!nearestCar) {
+            showMessage("Move closer to a car!");
+            return;
+        }
+
+        currentCar = nearestCar;
+        currentCar.occupied = true;
+
+        player.x = currentCar.x;
+        player.y = currentCar.y;
+
+        game.inCar = true;
+        game.fuel = currentCar.fuel;
+
+        showMessage(
+            "Driving: " + carTypes[currentCar.type].name
+        );
+    }
+
+    // GARAGE
+    function toggleGarage() {
+        if (game.garageOpen) {
+            closeGarage();
+            return;
+        }
+
+        const x = game.inCar ? currentCar.x : player.x;
+        const y = game.inCar ? currentCar.y : player.y;
+
+        const distance = Math.hypot(x - 235, y - 225);
+
+        if (distance > 130) {
+            showMessage("Go to the garage first!");
+            return;
+        }
+
+        openGarage();
+    }
+
+    function openGarage() {
+        game.garageOpen = true;
+        garagePanel.style.display = "block";
+
+        garagePanel.innerHTML = `
+            <h2>🏎️ CITY GARAGE</h2>
+            <p style="margin-bottom:10px">
+                Cash: $${game.money}
+            </p>
+            <div id="garage-options"></div>
+            <button class="garage-option" id="close-garage">
+                CLOSE GARAGE
+            </button>
+        `;
+
+        const options = garagePanel.querySelector("#garage-options");
+
+        carTypes.forEach((type, index) => {
+            const button = document.createElement("button");
+            button.className = "garage-option";
+
+            button.textContent =
+                `${type.name} — ${
+                    type.price === 0 ? "FREE" : "$" + type.price
+                }`;
+
+            button.addEventListener("click", () => {
+                buyCar(index);
+            });
+
+            options.appendChild(button);
+        });
+
+        document.getElementById("close-garage")
+            .addEventListener("click", closeGarage);
+    }
+
+    function closeGarage() {
+        game.garageOpen = false;
+        garagePanel.style.display = "none";
+    }
+
+    function buyCar(index) {
+        const type = carTypes[index];
+
+        if (game.money < type.price) {
+            showMessage("Not enough cash!");
+            return;
+        }
+
+        game.money -= type.price;
+
+        if (game.inCar && currentCar) {
+            currentCar.occupied = false;
+            currentCar = null;
+            game.inCar = false;
+        }
+
+        // Spawn purchased vehicle near the garage.
+        const newCar = createCar(
+            index,
+            320,
+            225,
+            Math.PI / 2
+        );
+
+        newCar.fuel = 100;
+
+        closeGarage();
+        showMessage("Purchased " + type.name + "!");
+    }
+
+    // REFUEL
+    function refuel() {
+        if (!game.inCar || !currentCar) {
+            showMessage("Enter a car to refuel.");
+            return;
+        }
+
+        const cost = Math.ceil((100 - currentCar.fuel) * 2);
+
+        if (cost === 0) {
+            showMessage("Your fuel tank is full!");
+            return;
+        }
+
+        if (game.money < cost) {
+            showMessage("Not enough cash to refuel!");
+            return;
+        }
+
+        game.money -= cost;
+        currentCar.fuel = 100;
+        game.fuel = 100;
+
+        showMessage("Vehicle refueled!");
+    }
+
+    // ADD REFUEL BUTTON
+    const refuelButton = document.createElement("button");
+
+    refuelButton.className = "game-btn action";
+    refuelButton.textContent = "FUEL";
+    refuelButton.style.position = "absolute";
+    refuelButton.style.right = "15px";
+    refuelButton.style.bottom = "315px";
+    refuelButton.style.width = "65px";
+    refuelButton.style.height = "42px";
+    refuelButton.style.fontSize = "11px";
+
+    container.appendChild(refuelButton);
+    refuelButton.addEventListener("click", refuel);
+
+    // COLLISION WITH BUILDINGS
+    function hitsBuilding(x, y, radius = 12) {
+        return buildings.some(building => {
+            return (
+                x + radius > building.x &&
+                x - radius < building.x + building.width &&
+                y + radius > building.y &&
+                y - radius < building.y + building.height
+            );
+        });
+    }
+
+    function keepInWorld(object) {
+        object.x = Math.max(15, Math.min(WORLD.width - 15, object.x));
+        object.y = Math.max(15, Math.min(WORLD.height - 15, object.y));
+    }
+
+    // GAME MESSAGES
+    function showMessage(text) {
+        game.message = text;
+        game.messageTime = 2.5;
+        messageDisplay.textContent = text;
+        messageDisplay.style.display = "block";
+    }
+
+    // UPDATE GAME
+    function update(dt) {
+        const forward =
+            keys["w"] || keys["arrowup"];
+
+        const backward =
+            keys["s"] || keys["arrowdown"];
+
+        const left =
+            keys["a"] || keys["arrowleft"];
+
+        const right =
+            keys["d"] || keys["arrowright"];
+
+        if (game.inCar && currentCar) {
+            const type = carTypes[currentCar.type];
+
+            if (currentCar.fuel > 0) {
+                if (forward) {
+                    currentCar.speed += 240 * dt;
+                }
+
+                if (backward) {
+                    currentCar.speed -= 300 * dt;
+                }
+
+                currentCar.fuel -=
+                    Math.abs(currentCar.speed) * 0.0015 * dt;
+
+                currentCar.fuel = Math.max(0, currentCar.fuel);
+            } else {
+                currentCar.speed *= Math.pow(0.94, dt * 60);
+            }
+
+            currentCar.speed = Math.max(
+                -type.speed * 0.35,
+                Math.min(type.speed, currentCar.speed)
+            );
+
+            const steering = Math.min(
+                1,
+                Math.abs(currentCar.speed) / 80
+            );
+
+            if (left) {
+                currentCar.angle -= 2.3 * steering * dt;
+            }
+
+            if (right) {
+                currentCar.angle += 2.3 * steering * dt;
+            }
+
+            const oldX = currentCar.x;
+            const oldY = currentCar.y;
+
+            currentCar.x +=
+                Math.sin(currentCar.angle) *
+                currentCar.speed * dt;
+
+            currentCar.y -=
+                Math.cos(currentCar.angle) *
+                currentCar.speed * dt;
+
+            keepInWorld(currentCar);
+
+            if (hitsBuilding(currentCar.x, currentCar.y, 18)) {
+                currentCar.x = oldX;
+                currentCar.y = oldY;
+                currentCar.speed *= -0.2;
+            }
+
+            player.x = currentCar.x;
+            player.y = currentCar.y;
+
+            game.fuel = currentCar.fuel;
+            game.speed = Math.abs(currentCar.speed) * 0.18;
+
+        } else {
+            let dx = 0;
+            let dy = 0;
+
+            if (forward) dy -= 1;
+            if (backward) dy += 1;
+            if (left) dx -= 1;
+            if (right) dx += 1;
+
+            if (dx !== 0 || dy !== 0) {
+                const length = Math.hypot(dx, dy);
+
+                dx /= length;
+                dy /= length;
+
+                const oldX = player.x;
+                const oldY = player.y;
+
+                player.x += dx * player.walkingSpeed * dt;
+                player.y += dy * player.walkingSpeed * dt;
+
+                if (hitsBuilding(player.x, player.y, player.radius)) {
+                    player.x = oldX;
+                    player.y = oldY;
+                }
+
+                player.angle = Math.atan2(dx, -dy);
+                keepInWorld(player);
+            }
+
+            game.speed = 0;
+        }
+
+        if (game.messageTime > 0) {
+            game.messageTime -= dt;
+
+            if (game.messageTime <= 0) {
+                messageDisplay.style.display = "none";
+            }
+        }
+    }
+
+    // DRAW GAME
+    function draw() {
+        const focus = game.inCar ? currentCar : player;
+
+        const cameraX = Math.max(
+            0,
+            Math.min(
+                WORLD.width - canvas.width,
+                focus.x - canvas.width / 2
+            )
+        );
+
+        const cameraY = Math.max(
+            0,
+            Math.min(
+                WORLD.height - canvas.height,
+                focus.y - canvas.height / 2
+            )
+        );
+
+        drawCity(cameraX, cameraY);
+
+        cars.forEach(car => {
+            drawCar(car, cameraX, cameraY);
+        });
+
+        drawPlayer(cameraX, cameraY);
+
+        // HUD
+        speedDisplay.textContent = Math.round(game.speed);
+
+        fuelFill.style.width = game.fuel + "%";
+
+        fuelPercent.textContent =
+            Math.round(game.fuel) + "%";
+
+        fuelFill.style.background =
+            game.fuel < 20 ? "#ff3333" : "#48e77c";
+
+        moneyDisplay.textContent = game.money;
+
+        wantedDisplay.textContent =
+            "★".repeat(game.wanted) +
+            "☆".repeat(5 - game.wanted);
+    }
+
+    // RESPONSIVE CANVAS
+    function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        canvas.width = Math.round(container.clientWidth * dpr);
+        canvas.height = Math.round(container.clientHeight * dpr);
+
+        // Draw in CSS pixel coordinates.
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    // MAIN LOOP
+    let previousTime = performance.now();
+
+    function loop(now) {
+        const dt = Math.min((now - previousTime) / 1000, 0.05);
+
+        previousTime = now;
+
+        update(dt);
+
+        // Camera calculations use CSS pixel dimensions.
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Ensure world drawing uses CSS pixels.
+        const originalWidth = canvas.width;
+        const originalHeight = canvas.height;
+
+        canvas.width = originalWidth;
+        canvas.height = originalHeight;
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        draw();
+
+        requestAnimationFrame(loop);
+    }
+
+    // START GAME
+    resizeCanvas();
+
+    window.addEventListener("resize", resizeCanvas);
+
+    // Make game functions accessible for future updates.
+    window.EmpireOfCrime = {
+        game,
+        player,
+        cars,
+        carTypes,
+        toggleVehicle,
+        toggleGarage,
+        refuel
+    };
+
+    showMessage("Welcome! Find a car and press ENTER.");
+
+    requestAnimationFrame(loop);
+
+})();
