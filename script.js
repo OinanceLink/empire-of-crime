@@ -844,14 +844,44 @@
     }
 
     // MAIN LOOP
-    let previousTime = performance.now();
+let previousTime = performance.now();
 
-    function loop(now) {
-        const dt = Math.min((now - previousTime) / 1000, 0.05);
+function loop(now) {
+    const dt = Math.min((now - previousTime) / 1000, 0.05);
+    previousTime = now;
 
-        previousTime = now;
+    update(dt);
+    draw();
 
-        update(dt);
+    requestAnimationFrame(loop);
+}
+
+// RESPONSIVE CANVAS
+function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = Math.round(container.clientWidth * dpr);
+    canvas.height = Math.round(container.clientHeight * dpr);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+window.EmpireOfCrime = {
+    game,
+    player,
+    cars,
+    carTypes,
+    toggleVehicle,
+    toggleGarage,
+    refuel
+};
+
+showMessage("Welcome to Empire of Crime!");
+
+requestAnimationFrame(loop);
 
         // Camera calculations use CSS pixel dimensions.
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
