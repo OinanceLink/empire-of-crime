@@ -3,21 +3,23 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html,
 body {
   margin: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  background: #080b10;
+  background: #14201e;
   color: white;
-  font-family: Arial, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   touch-action: none;
-  user-select: none;
 }
 
-canvas {
+#game {
   display: block;
   width: 100%;
-  height: 100dvh;
-  background: #20262c;
+  height: 100%;
+  background: #7fbd73;
 }
 
 #hud {
@@ -25,175 +27,238 @@ canvas {
   top: 10px;
   left: 10px;
   right: 10px;
-  padding: 10px;
-  background: #080b10ef;
-  border: 1px solid #3b4654;
+  padding: 12px;
+  border: 1px solid #ffffff30;
   border-radius: 12px;
+  background: #101a20e8;
+  box-shadow: 0 4px 15px #0005;
   pointer-events: none;
 }
 
-#hud h2 {
-  margin: 0 0 7px;
-  color: #f5a623;
-  font-size: 18px;
+.brand {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.brand span {
+  color: #ffad35;
+}
+
+.subtitle {
+  color: #b9c7ce;
+  font-size: 9px;
+  margin-top: 3px;
+  letter-spacing: 2px;
 }
 
 .stats {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  font-size: 12px;
-  margin-top: 5px;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 9px;
+  font-size: 11px;
 }
 
-#fuelOuter {
-  width: 110px;
-  height: 8px;
-  background: #454545;
+.stats div {
+  min-width: 0;
+}
+
+.stats b {
+  color: #ffd078;
+}
+
+.fuel-container {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  margin-top: 10px;
+}
+
+.fuel-track {
+  flex: 1;
+  height: 6px;
+  background: #ffffff30;
   border-radius: 8px;
   overflow: hidden;
-  display: inline-block;
-  vertical-align: middle;
 }
 
 #fuelBar {
+  display: block;
   width: 100%;
   height: 100%;
-  background: #55d879;
+  background: #67df83;
+}
+
+#wanted {
+  color: #ffd078;
+  font-size: 11px;
+  margin-top: 9px;
 }
 
 #mission {
+  font-size: 11px;
+  margin-top: 7px;
+  color: #ffffffd9;
+}
+
+#notification {
+  position: absolute;
+  top: 205px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 88%;
+  width: max-content;
+  padding: 10px 15px;
+  background: #111b22e8;
+  border: 1px solid #ffffff25;
+  border-radius: 8px;
   font-size: 12px;
-  color: #e1e5ea;
-  margin-top: 6px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity .2s;
+  pointer-events: none;
 }
 
 #controls {
   position: absolute;
-  left: 12px;
-  bottom: 18px;
-  display: grid;
-  grid-template-columns: 49px 49px 49px;
-  grid-template-rows: 49px 49px;
-  gap: 5px;
+  left: 15px;
+  bottom: 28px;
+  width: 145px;
+  height: 145px;
 }
 
 button {
-  border: 1px solid #657386;
-  border-radius: 12px;
-  background: #202833ed;
+  border: 1px solid #ffffff40;
+  background: #111c25e8;
   color: white;
-  font-size: 21px;
+  border-radius: 12px;
   font-weight: bold;
-  touch-action: none;
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
 }
 
-button:active {
-  background: #f5a623;
-  color: #111;
+#controls button {
+  position: absolute;
+  width: 45px;
+  height: 45px;
+  font-size: 19px;
 }
 
 #up {
-  grid-column: 2;
-  grid-row: 1;
+  top: 0;
+  left: 50px;
 }
 
 #left {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-#down {
-  grid-column: 2;
-  grid-row: 2;
+  top: 50px;
+  left: 0;
 }
 
 #right {
-  grid-column: 3;
-  grid-row: 2;
+  top: 50px;
+  right: 0;
 }
 
-#driveControls {
+#down {
+  bottom: 0;
+  left: 50px;
+}
+
+#actions {
   position: absolute;
-  right: 12px;
-  bottom: 18px;
+  right: 10px;
+  bottom: 25px;
+  width: 135px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.driveButton {
-  width: 82px;
-  height: 48px;
-  font-size: 12px;
-  background: #303b49ed;
-}
-
-#enterBtn {
-  background: #176b43ed;
-}
-
-#garageBtn {
-  background: #a66a15ed;
-}
-
-#missionBtn {
-  background: #303b49ed;
-}
-
-#message {
-  display: none;
-  position: absolute;
-  z-index: 10;
-  left: 8%;
-  right: 8%;
-  top: 35%;
-  padding: 18px;
-  text-align: center;
-  border: 1px solid #f5a623;
-  border-radius: 15px;
-  background: #080b10f5;
-}
-
-#message h2 {
-  color: #f5a623;
-  margin-top: 0;
-}
-
-#message p {
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-#continueBtn {
-  padding: 12px 22px;
-  background: #f5a623;
-  color: #111;
-  font-size: 14px;
-}
-
-#messageButtons button {
+#actions button {
   min-height: 40px;
+  font-size: 10px;
+  background: #17252de8;
 }
 
-@media (max-width: 370px) {
-  #controls {
-    left: 7px;
-    grid-template-columns: 43px 43px 43px;
-    grid-template-rows: 43px 43px;
-  }
+#actions button:active,
+#controls button:active {
+  background: #d98421;
+}
 
-  .driveButton {
-    width: 70px;
-    height: 44px;
-  }
+#panel {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: #0009;
+}
 
-  #hud h2 {
-    font-size: 16px;
+#panel.visible {
+  display: flex;
+}
+
+.panel-box {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  padding: 22px;
+  background: #17232c;
+  border: 1px solid #ffffff40;
+  border-radius: 15px;
+  box-shadow: 0 10px 40px #0008;
+}
+
+.panel-box h2 {
+  margin: 0 35px 12px 0;
+  color: #ffb84e;
+  font-size: 20px;
+}
+
+.panel-box p {
+  color: #e2e8eb;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+#panelButtons {
+  display: grid;
+  gap: 9px;
+  margin-top: 15px;
+}
+
+#panelButtons button {
+  padding: 13px;
+  text-align: left;
+  font-size: 12px;
+}
+
+.close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+}
+
+@media (max-height: 600px) {
+  #hud {
+    padding: 8px;
   }
 
   .stats {
-    gap: 5px 9px;
+    margin-top: 5px;
+  }
+
+  #controls {
+    bottom: 10px;
+  }
+
+  #actions {
+    bottom: 10px;
   }
 }
